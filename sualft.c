@@ -6,6 +6,7 @@
 #include "cwp.h"
 #include "segy.h"
 #include "header.h"
+#include "math.h"
 #include <time.h>
 #include "fftw3.h" 
 #include "alft.h"
@@ -137,7 +138,7 @@ int main(int argc, char **argv)
   	if (hmax<h[ix]) hmax = h[ix]; 
   }
   for (ix=0;ix<nx;ix++){
-  	ih[ix] = (int) trunc((h[ix]-hmin)/dh);
+  	ih[ix] = (int) truncf((h[ix]-hmin)/dh);
   }
   nx_out = 0;
   for (ix=0;ix<nx;ix++){
@@ -169,7 +170,7 @@ process using sliding time windows
  taper = 0;
  for (Itw=0;Itw<Ntw;Itw++){	
    if (Itw == 0){
-	 Ntw = (int) trunc(nt/(Ltw-Dtw));
+	 Ntw = (int) truncf(nt/(Ltw-Dtw));
 	 if ( (float) nt/(Ltw-Dtw) - (float) Ntw > 0) Ntw++;
    }		
    twstart = (int) Itw * (int) (Ltw-Dtw);
@@ -185,6 +186,8 @@ process using sliding time windows
      }
    }
    fprintf(stderr,"processing time window %d of %d\n",Itw+1,Ntw);
+   if (verbose) fprintf(stderr,"Ltw=%d\n",Ltw);
+   if (verbose) fprintf(stderr,"Dtw=%d\n",Dtw);
    process_time_window(din_tw,dout_tw,h,h_out,hmin,hmax,dt,Ltw,nx,nx_out,fmin,fmax,niter,padt,padx,verbose); 
    if (Itw==0){ 
      for (ix=0;ix<nx_out;ix++){ 

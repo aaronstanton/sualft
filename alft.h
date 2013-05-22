@@ -41,30 +41,28 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
 
   czero.r=czero.i=0;  
   ntfft = npfar(padt*nt);
-  if (padx*nx_out > nx){
-    nxfft = padx*nx_out;
-  }
-  else {
-    nxfft = nx;
-  }
+  nxfft = padx*nx_out;
   if (verbose) fprintf(stderr,"using nxfft=%d\n",nxfft);
-  
+
   nw=ntfft/2+1;
   freqslice_in  = ealloc1complex(nx);
   freqslice_out = ealloc1complex(nxfft);
-  pfft  = ealloc2float(ntfft,nxfft); 
-  cpfft = ealloc2complex(nw,nxfft); 
-
+  if (nxfft > nx){
+    pfft  = ealloc2float(ntfft,nxfft); 
+    cpfft = ealloc2complex(nw,nxfft); 
+  }
+  else {
+    pfft  = ealloc2float(ntfft,nx); 
+    cpfft = ealloc2complex(nw,nx); 
+  }
   /* copy data from input to FFT array and pad with zeros in time dimension*/
   for (ix=0;ix<nx;ix++){
     for (it=0; it<nt; it++) pfft[ix][it]=din[ix][it];
     for (it=nt; it< ntfft;it++) pfft[ix][it] = 0.0;
   }
-
   for (ix=nx;ix<nxfft;ix++){
     for (it=0; it<ntfft; it++) pfft[ix][it]=0;
   }
-
   /******************************************************************************************** TX to FX
   transform data from t-x to w-x using FFTW */
   N = ntfft; 
@@ -84,20 +82,18 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
   fftwf_free(in); fftwf_free(out);
 
   /********************************************************************************************/
-		
   if(fmin>0){ 
-    if_low = trunc(fmin*dt*ntfft);
+    if_low = (int) truncf(fmin*dt*ntfft);
   }
   else{
     if_low = 0;
   }
   if(fmax*dt*ntfft<nw){ 
-    if_high = trunc(fmax*dt*ntfft);
+    if_high = (int) truncf(fmax*dt*ntfft);
   }
   else{
     if_high = 0;
   }
-
   /* loop over frequency slices */
   for (iw=if_low;iw<if_high;iw++){
     if (verbose) fprintf(stderr,"\r                                         ");
