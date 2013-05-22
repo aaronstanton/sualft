@@ -23,18 +23,23 @@ void alft_zero_previous_coeffs(complex *Din,int iter,int *index_iter);
 void process_time_window(float **din,float **dout,float *x_in,float *x_out,float xmin,float xmax,float dt,int nt,int nx,int nx_out,float fmin,float fmax,int niter,int padt,int padx,int verbose)
 {
   int it, ix, iw;
-  complex czero;czero.r=czero.i=0;
+  complex czero;
   int ntfft, nxfft, nw;
   float**   pfft; 
   complex** cpfft;
   complex* freqslice_in;
   complex* freqslice_out;
+  float* in;
+  complex* in2;
+  complex* out;
+  float* out2;
   int if_low;
   int if_high;
   int N; 
-  float* in;
-  float* out2;
-  
+  fftwf_plan p1;
+  fftwf_plan p4;
+
+  czero.r=czero.i=0;  
   ntfft = npfar(padt*nt);
   if (padx*nx_out > nx){
     nxfft = padx*nx_out;
@@ -42,8 +47,9 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
   else {
     nxfft = nx;
   }
+  if (verbose) fprintf(stderr,"using nxfft=%d\n",nxfft);
+  
   nw=ntfft/2+1;
-
   freqslice_in  = ealloc1complex(nx);
   freqslice_out = ealloc1complex(nxfft);
   pfft  = ealloc2float(ntfft,nxfft); 
@@ -62,8 +68,7 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
   /******************************************************************************************** TX to FX
   transform data from t-x to w-x using FFTW */
   N = ntfft; 
-  complex* out = ealloc1complex(nw);
-  fftwf_plan p1;
+  out = ealloc1complex(nw);
   in = ealloc1float(N);
   p1 = fftwf_plan_dft_r2c_1d(N, in, (fftwf_complex*)out, FFTW_ESTIMATE);
   for (ix=0;ix<nx;ix++){
@@ -95,8 +100,8 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
 
   /* loop over frequency slices */
   for (iw=if_low;iw<if_high;iw++){
-    fprintf(stderr,"\r                                         ");
-    fprintf(stderr,"\rfrequency slice %d of %d",iw-if_low+1,if_high-if_low);  
+    if (verbose) fprintf(stderr,"\r                                         ");
+    if (verbose) fprintf(stderr,"\rfrequency slice %d of %d",iw-if_low+1,if_high-if_low);  
     for (ix=0;ix<nx;ix++){
       freqslice_in[ix] = cpfft[ix][iw];	
     }
@@ -124,8 +129,7 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
   transform data from w-x to t-x using IFFTW */
   N = ntfft; 
   out2 = ealloc1float(ntfft);
-  fftwf_plan p4;
-  complex* in2 = ealloc1complex(N);
+  in2 = ealloc1complex(N);
   p4 = fftwf_plan_dft_c2r_1d(N, (fftwf_complex*)in2, out2, FFTW_ESTIMATE);
   for (ix=0;ix<nx_out;ix++){
     for(iw=0;iw<nw;iw++){
@@ -136,7 +140,7 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
       pfft[ix][it] = out2[it]; 
     }
   }
-  fprintf(stderr,"\n");
+  if (verbose) fprintf(stderr,"\n");
 
   fftwf_destroy_plan(p4);
   fftwf_free(in2); fftwf_free(out2);
@@ -156,8 +160,11 @@ void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float
   int iter,ix,*index,*index_iter;
   float *k,dx,dk;
   complex *value;
-  complex czero;czero.r=czero.i=0;
-  complex *d_1_coeff,*Din,*Dout;
+  complex czero;
+  complex *d_1_coeff;
+  complex *Din;
+  complex *Dout;
+
   k = ealloc1float(nxfft);
   d_1_coeff = ealloc1complex(nx_in);
   index = ealloc1int(1);
@@ -165,6 +172,7 @@ void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float
   value = ealloc1complex(1);
   Din = ealloc1complex(nxfft);
   Dout = ealloc1complex(nxfft);
+  czero.r=czero.i=0;
   for (ix=0;ix<nx_in;ix++){
     d_1_coeff[ix] = czero;
   }
@@ -204,10 +212,12 @@ void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float
 
 void alft_DFT_x_to_k(complex *din,complex *Din,float *x_in,float xmin,float xmax,float *k,int nx_in,int nx_out)
 {
-  complex czero;czero.r=czero.i=0;
+  complex czero;
   int ik,ix;
   float dx,dX;
   complex a,b,c;
+  
+  czero.r=czero.i=0;
   dX = xmax - xmin;  
 
   for (ik=0;ik<nx_out;ik++){
@@ -229,10 +239,11 @@ void alft_DFT_x_to_k(complex *din,complex *Din,float *x_in,float xmin,float xmax
 
 void alft_DFT_k_to_x(complex *Dout,complex *dout,float *x_out,float xmin,float xmax,float *k,int nx_in,int nx_out)
 {
-  complex czero;czero.r=czero.i=0;
+  complex czero;
   int ik,ix;
   complex a,b;
   
+  czero.r=czero.i=0;
   for (ix=0;ix<nx_out;ix++) dout[ix] = czero;
   for (ik=0;ik<nx_out;ik++){
   	for (ix=0;ix<nx_out;ix++){
@@ -267,11 +278,13 @@ void alft_save_coeff(complex *Dout,int *index,complex *value)
 
 void alft_DFT_1_coeff_k_to_x(complex *d_1_coeff,float *x_in,float xmin,float xmax,int nx_in,float k,complex *value)
 {
-  complex czero;czero.r=czero.i=0;
+  complex czero;
   float dx,dX;
-  dX = xmax - xmin;  
-  int ik,ix;
-  complex a;  
+  int ix;
+  complex a; 
+  
+  dX = xmax - xmin;    
+  czero.r=czero.i=0;
   for (ix=0;ix<nx_in;ix++){
     if (ix==0) dx = 2*((x_in[ix+1] - x_in[ix])/2);
     else if (ix==nx_in-1) dx = 2*((x_in[ix] - x_in[ix-1])/2);

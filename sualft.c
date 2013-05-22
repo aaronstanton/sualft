@@ -22,8 +22,8 @@ char *sdoc[] = {
   "                                                                   ",
   " User provides:                                                    ",
   "           < in.su, > out.su                                       ",
-  " Other parameters: (parameter and its default setting)             ",
   "                                                                   ",
+  " Other parameters: (parameter and its default setting)             ",
   "           verbose=0; (=1 to show messages)                        ",
   "           nx=10000; (number of input traces)                      ",
   "           dh=10 (desired output spatial sampling (meters))        ",
@@ -77,7 +77,7 @@ int main(int argc, char **argv)
   int verbose;
   time_t start,finish;
   double elapsed_time;
-  int it,ix,nt,nx,nx_out,method;
+  int ix,nt,nx,nx_out;
   float dt,dh,hmin,hmax;
   float *h,*h_out;
   float **din,**dout,**din_tw,**dout_tw;
