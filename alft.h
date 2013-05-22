@@ -6,6 +6,7 @@
 #include "cwp.h"
 #include "fftw3.h"
 #include "math.h"
+#include <stdlib.h>
 
 #ifndef MARK
 #define MARK fprintf(stderr,"%s @ %u\n",__FILE__,__LINE__);fflush(stderr);

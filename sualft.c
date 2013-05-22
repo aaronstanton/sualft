@@ -7,6 +7,7 @@
 #include "segy.h"
 #include "header.h"
 #include "math.h"
+#include <stdlib.h>
 #include <time.h>
 #include "fftw3.h" 
 #include "alft.h"
