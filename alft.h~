@@ -314,7 +314,7 @@ void alft_zero_previous_coeffs(complex *Din,int iter,int *index_iter)
   return;
 }
 
-void dft_op(complex *d,complex *D,float *x,float xmin,float xmax,float *k,int nx_in,int nx,int nk,int fwd)
+void dft_op(complex *d,complex *D,float *x,float xmin,float xmax,float *k,int nx_in,sint nx,int nk,int fwd)
 {
   complex czero;
   int ik,ix;
