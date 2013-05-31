@@ -98,7 +98,7 @@ int main(int argc, char **argv)
   if (!tr.dt) err("dt header field must be set");
   if (!tr.ns) err("ns header field must be set");
   if (!getparint("Ltw", &Ltw))  Ltw = 200; /* length of time window in samples */
-  if (!getparint("Dtw", &Dtw))  Dtw = 10; /* overlap of time windows in samples	*/
+  if (!getparint("Dtw", &Dtw))  Dtw = 10;  /* overlap of time windows in samples */
   dt   = ((float) tr.dt)/1000000.0;
   nt = (int) tr.ns;
   if (!getparint("padt", &padt)) padt = 2; /* padding factor in time dimension*/
