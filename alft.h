@@ -181,9 +181,10 @@ void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float
   }
   
   dx = (float) x_out[1] - x_out[0];
-  dk = (float) 1/(dx*nxfft);
+  /* dk = (float) 1/(dx*(nxfft-1)); */
+  dk = (float) 1/nxfft/dx;
   for (ix=0;ix<nxfft;ix++){    
-  	k[ix] = (float) ix*dk;
+  	k[ix] = (float) (-nxfft/2 + ix)*dk;
   }
   
   for (iter=0;iter<niter;iter++){  

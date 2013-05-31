@@ -38,20 +38,13 @@ char *sdoc[] = {
   "           niter=100; (number of iterations of ALFT)               ",
   "                                                                   ",
   " Example:                                                          ",
-  " # make synthetic data consisting of two linear events             ",
-  "           suwaveform type=ricker1 fpeak=30 | sugain pbal=1 > wavelet.su",
-  "           suplane nt=200 npl=2 ntr=500 dip1=0 dip2=1 len1=500 len2=500 | suconv sufile=wavelet.su > tmp1.su",
-  " # set offset header to 1m sampling                                 ",
-  "           suchw key1=offset key2=tracl a=0 b=1 < tmp1.su > din.su  ",
-  "           rm -f tmp1.su;                                           ",
-  " # get rid of 75% of the traces                                     ",
-  "           sudecimate < din.su > din_dec.su dec=0.75 verbose=1      ",
-  " # reconstruct the data                                             ",
-  "           sualft < din_dec.su > dout.su dh=1 niter=10 verbose=1 fmax=80 Ltw=250",
-  " # plot results                                                     ",
-  " suxwigb < din.su     key=offset clip=2 title='True data'      label2='Offset (m)'  label1='Time (s)'& ",
-  " suxwigb < din_dec.su key=offset clip=2 title='Decimated data' label2='Offset (m)'  label1='Time (s)'& ",
-  " suxwigb < dout.su    key=offset clip=2 title='ALFT result'    label2='Offset (m)'  label1='Time (s)'& ",
+  " # make synthetic data (mean 10m receiver spacing with 5m std dev) ",
+  "           suplane5d gy_std_dev=5 verbose=1 > din.su               ",
+  " # reconstruct the data to 3m trace spacing                        ",
+  "           sualft < din.su > dout.su dh=3 verbose=1 fmax=80        ",
+  " # plot results                                                    ",
+  " suxwigb key=offset clip=1 title='Input'  label2='Offset (m)' label1='Time (s)'&  < din.su  ",
+  " suxwigb key=offset clip=1 title='Output' label2='Offset (m)' label1='Time (s)'&  < dout.su ",
   "                                                                   ",
   " References:                                                       ",
   " Xu, S., Y. Zhang, D. Pham, and G. Lambaré, 2005b, Antileakage     ",
@@ -145,7 +138,7 @@ int main(int argc, char **argv)
   for (ix=0;ix<nx;ix++){
   	if (nx_out<ih[ix]) nx_out = ih[ix] + 1; 
   }
- 
+  nx_out = nx_out + 1;
   ih_out = ealloc1int(nx_out);
   h_out = ealloc1float(nx_out);
 
