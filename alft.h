@@ -12,18 +12,21 @@
 #define MARK fprintf(stderr,"%s @ %u\n",__FILE__,__LINE__);fflush(stderr);
 #endif
 
-void process_time_window(float **din,float **dout,float *x_in,float *x_out,float xmin,float xmax,float dt,int nt,int nx,int nx_out,float fmin,float fmax,int niter,int padt,int padx,int verbose);
-void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float xmax,int nx_in,int nx_out,int nxfft,int niter);
+void process_time_window(float **din,float **dout,float *x_in,float *x_out,float xmin,float xmax,float dt,int nt,int nx,int nx_out,float fmin,float fmax,int niter,int padt,int padx,int method,float tol,int lsfit_niter,int verbose);
+void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float xmax,int nx_in,int nx_out,int nxfft,int niter,int method,float tol,int lsfit_niter);
 void alft_DFT_x_to_k(complex *din,complex *Din,float *x_in,float xmin,float xmax,float *k,int nx_in,int nxfft);
 void alft_DFT_k_to_x(complex *Dout,complex *dout,float *x_out,float xmin,float xmax,float *k,int nx_out,int nxfft);
 void alft_pick_higest_amp(complex *Din,int nxfft,int *index,complex *value);
 void alft_save_coeff(complex *Dout,int *index,complex *value);
-void alft_DFT_1_coeff_k_to_x(complex *d_1_coeff,float *x_in,float xmin,float xmax,int nx_in,float k,complex *value);
-void alft_subtract_from_input(complex *din,complex *d_1_coeff,int nx_in);
+void alft_DFT_1_coeff_k_to_x(complex *d_coeff,float *x_in,float xmin,float xmax,int nx_in,float k,complex *value);
+void alft_subtract_from_input(complex *din,complex *d_coeff,int nx_in);
 void alft_zero_previous_coeffs(complex *Din,int iter,int *index_iter);
-void dft_op(complex *d,complex *D,float *x,float xmin,float xmax,float *k,int nx_in,int nx,int nk,int fwd);
+void alft_pick_higest_n_amps(complex *Din,int nxfft,int n, int *index,complex *value);
+void alft_ls_fit(complex *d_coeff,float *x_in,float xmin,float xmax,int nx_in,float *k,int *index_iter,complex *value_iter,int ncoeff,int lsfit_niter);
+void alft_DFT_n_coeff_k_to_x(complex *d_coeff,float *x_in,float xmin,float xmax,int nx_in,float *k,int *index_iter,complex *value,int nk,int fwd);
+float alft_norm_res(complex *d,int nx_in);
 
-void process_time_window(float **din,float **dout,float *x_in,float *x_out,float xmin,float xmax,float dt,int nt,int nx,int nx_out,float fmin,float fmax,int niter,int padt,int padx,int verbose)
+void process_time_window(float **din,float **dout,float *x_in,float *x_out,float xmin,float xmax,float dt,int nt,int nx,int nx_out,float fmin,float fmax,int niter,int padt,int padx,int method,float tol,int lsfit_niter,int verbose)
 {
   int it, ix, iw;
   complex czero;
@@ -108,7 +111,7 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
       freqslice_out[ix] = czero;	
     }
     /* the reconstruction engine */
-    alft1d(freqslice_in,freqslice_out,x_in,x_out,xmin,xmax,nx,nx_out,nxfft,niter);   
+    alft1d(freqslice_in,freqslice_out,x_in,x_out,xmin,xmax,nx,nx_out,nxfft,niter,method,tol,lsfit_niter);   
     for (ix=0;ix<nx_out;ix++){
       cpfft[ix][iw] = freqslice_out[ix];
     }
@@ -154,29 +157,35 @@ void process_time_window(float **din,float **dout,float *x_in,float *x_out,float
 
 }
 
-void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float xmax,int nx_in,int nx_out,int nxfft,int niter)
+void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float xmax,int nx_in,int nx_out,int nxfft,int niter,int method,float tol,int lsfit_niter)
 {
   int iter,ix,*index,*index_iter;
   float *k,dx,dk;
   complex *value;
+  complex *value_iter;
   complex czero;
-  complex *d_1_coeff;
-  complex *Din;
+  complex *d_coeff;
+  complex *D;
   complex *Dout;
-
+  complex *res;
+  
+  method=1;
+  tol = tol*alft_norm_res(din,nx_in); 
+  
   k = ealloc1float(nxfft);
-  d_1_coeff = ealloc1complex(nx_in);
+  d_coeff = ealloc1complex(nx_in);
   index = ealloc1int(1);
-  index_iter = ealloc1int(niter);
+  index_iter = ealloc1int(nxfft);
   value = ealloc1complex(1);
-  Din = ealloc1complex(nxfft);
+  value_iter = ealloc1complex(nxfft);
+  D = ealloc1complex(nxfft);
   Dout = ealloc1complex(nxfft);
   czero.r=czero.i=0;
   for (ix=0;ix<nx_in;ix++){
-    d_1_coeff[ix] = czero;
+    d_coeff[ix] = czero;
   }
   for (ix=0;ix<nxfft;ix++){
-    Din[ix] = czero;
+    D[ix] = czero;
     Dout[ix] = czero;
   }
   
@@ -187,24 +196,43 @@ void alft1d(complex *din,complex *dout,float *x_in,float *x_out,float xmin,float
   	k[ix] = (float) (-nxfft/2 + ix)*dk;
   }
   
-  for (iter=0;iter<niter;iter++){  
-    alft_DFT_x_to_k(din,Din,x_in,xmin,xmax,k,nx_in,nxfft);
-    alft_zero_previous_coeffs(Din,iter,index_iter);    
-    alft_pick_higest_amp(Din,nxfft,index,value);   
-    alft_save_coeff(Dout,index,value);
-    index_iter[iter] = index[0];    
-    alft_DFT_1_coeff_k_to_x(d_1_coeff,x_in,xmin,xmax,nx_in,k[index[0]],value);    
-    alft_subtract_from_input(din,d_1_coeff,nx_in);    
-  }    
-  alft_DFT_k_to_x(Dout,dout,x_out,xmin,xmax,k,nx_out,nxfft);
+  if (method==1){ /* Anti-Leakage Fourier Transform (Xu et al, 2005) */
+    for (iter=0;iter<niter;iter++){  
+      alft_DFT_x_to_k(din,D,x_in,xmin,xmax,k,nx_in,nxfft);
+      alft_zero_previous_coeffs(D,iter,index_iter);    
+      alft_pick_higest_amp(D,nxfft,index,value);   
+      alft_save_coeff(Dout,index,value);
+      index_iter[iter] = index[0];    
+      alft_DFT_1_coeff_k_to_x(d_coeff,x_in,xmin,xmax,nx_in,k[index[0]],value);    
+      alft_subtract_from_input(din,d_coeff,nx_in);    
+    }
+    alft_DFT_k_to_x(Dout,dout,x_out,xmin,xmax,k,nx_out,nxfft);
+  }
+  else if (method==2){ /* Orthogonal Matching Pursuit (Hollander et al, 2012) */
+    res = ealloc1complex(nx_in);
+  	for (ix=0;ix<nx_in;ix++) res[ix] = din[ix];
+  	iter=0;
+    while (iter<niter && alft_norm_res(res,nx_in) > tol){
+      alft_DFT_x_to_k(res,D,x_in,xmin,xmax,k,nx_in,nxfft);
+      alft_pick_higest_n_amps(D,nxfft,iter+1,index_iter,value_iter);   
+      alft_ls_fit(din,x_in,xmin,xmax,nx_in,k,index_iter,value_iter,iter+1,lsfit_niter);
+      alft_DFT_n_coeff_k_to_x(d_coeff,x_in,xmin,xmax,nx_in,k,index_iter,value_iter,iter+1,1);    
+      alft_subtract_from_input(res,d_coeff,nx_in);
+      iter++;
+    }
+    for (iter=0;iter<niter;iter++) Dout[index_iter[iter]] = value_iter[iter];
+    alft_DFT_k_to_x(Dout,dout,x_out,xmin,xmax,k,nx_out,nxfft);
+    free1complex(res);
+  }
   
   
   free1float(k);
-  free1complex(d_1_coeff);
-  free1complex(Din);
+  free1complex(d_coeff);
+  free1complex(D);
   free1complex(Dout);  
   free1int(index);
   free1complex(value);
+  free1complex(value_iter);
   free1int(index_iter);
    
   return;  
@@ -276,7 +304,7 @@ void alft_save_coeff(complex *Dout,int *index,complex *value)
   return;
 }
 
-void alft_DFT_1_coeff_k_to_x(complex *d_1_coeff,float *x_in,float xmin,float xmax,int nx_in,float k,complex *value)
+void alft_DFT_1_coeff_k_to_x(complex *d_coeff,float *x_in,float xmin,float xmax,int nx_in,float k,complex *value)
 {
   complex czero;
   float dx,dX;
@@ -290,7 +318,7 @@ void alft_DFT_1_coeff_k_to_x(complex *d_1_coeff,float *x_in,float xmin,float xma
     else if (ix==nx_in-1) dx = 2*((x_in[ix] - x_in[ix-1])/2);
     else dx = ((x_in[ix+1] - x_in[ix])/2) + ((x_in[ix] - x_in[ix-1])/2);
     a.r = cos(2*PI*k*x_in[ix]); a.i = sin(2*PI*k*x_in[ix]);
-    d_1_coeff[ix] = cmul(value[0],a);
+    d_coeff[ix] = cmul(value[0],a);
   } 
   
   return;
@@ -315,47 +343,83 @@ void alft_zero_previous_coeffs(complex *Din,int iter,int *index_iter)
   return;
 }
 
-void dft_op(complex *d,complex *D,float *x,float xmin,float xmax,float *k,int nx_in,int nx,int nk,int fwd)
-{
+void alft_pick_higest_n_amps(complex *Din,int nxfft,int n, int *index,complex *value)
+{   
   complex czero;
-  int ik,ix;
-  float dx,dX;
-  complex a,b,c;
-  
+  int i,ik;
+  float *max_amp;
+  max_amp = ealloc1float(n);
   czero.r=czero.i=0;
-  dX = xmax - xmin;  
+  for (i=0;i<n;i++){
+    max_amp[i] = 0;
+    for (ik=0;ik<nxfft;ik++){
+      if (rcabs(Din[ik]) > max_amp[i]){
+        index[i] = ik; 
+        value[i] = Din[ik];
+        max_amp[i] = rcabs(Din[ik]);        
+      } 
+    }
+    Din[index[i]] = czero;
+  }
+  return;
+}
 
-  if (fwd){ /* forward operator, uses D to make d */
-    for (ix=0;ix<nx_in;ix++){
-  	  d[ix] = czero;
-  	  for (ik=0;ik<nk;ik++){
-        if (ix==0) dx = 2*((x[ix+1] - x[ix])/2);
-        else if (ix==nx_in-1) dx = 2*((x[ix] - x[ix-1])/2);
-        else dx = ((x[ix+1] - x[ix])/2) + ((x[ix] - x[ix-1])/2);
-        a.r = cos(2*PI*k[ik]*x[ix]); a.i = sin(-2*PI*k[ik]*x[ix]);
-        b = cmul(D[ik],a);
-        c = crmul(b,dx/dX);
-        d[ix].r = d[ix].r + c.r;
-        d[ix].i = d[ix].i + c.i;
-      }
-    }
-  }
-  else{ /* adjoint operator, uses d to make D*/
-    for (ik=0;ik<nk;ik++){
-  	  D[ik] = czero;
-  	  for (ix=0;ix<nx_in;ix++){
-        if (ix==0) dx = 2*((x[ix+1] - x[ix])/2);
-        else if (ix==nx_in-1) dx = 2*((x[ix] - x[ix-1])/2);
-        else dx = ((x[ix+1] - x[ix])/2) + ((x[ix] - x[ix-1])/2);
-        a.r = cos(-2*PI*k[ik]*x[ix]); a.i = sin(-2*PI*k[ik]*x[ix]);
-        b = cmul(d[ix],a);
-        c = crmul(b,dx/dX);
-        D[ik].r = D[ik].r + c.r;
-        D[ik].i = D[ik].i + c.i;
-      }
-    }
-  }
+void alft_ls_fit(complex *din,float *x_in,float xmin,float xmax,int nx_in,float *k,int *index_iter,complex *value_iter,int ncoeff,int lsfit_niter)
+{ 
+
+  /*write conjugate gradients algorithm here. should have capability to add weights (write the separate operators version)
+  also need to write the DFT operator for a fixed number of coefficients as a separate operator.*/
   
   return;
 }
 
+void alft_DFT_n_coeff_k_to_x(complex *d_coeff,float *x_in,float xmin,float xmax,int nx_in,float *k,int *index_iter,complex *value,int nk,int fwd)
+{    
+
+  complex czero;
+  float dx,dX;
+  int ix,ik;
+  complex a,b,c;
+  dX = xmax - xmin;    
+  czero.r=czero.i=0;
+
+
+  if (fwd==1){
+  for (ix=0;ix<nx_in;ix++){
+    d_coeff[ix] = czero;
+    for (ik=0;ik<nk;ik++){
+      a.r = cos(2*PI*k[index_iter[ik]]*x_in[ix]); a.i = sin(2*PI*k[index_iter[ik]]*x_in[ix]);
+      b = cmul(value[ik],a);
+      d_coeff[ix] = cadd(d_coeff[ix],b);
+    }
+  } 
+  }
+  else{ /* adjoint */
+  for (ik=0;ik<nk;ik++){
+  	value[ik] = czero;
+    for (ix=0;ix<nx_in;ix++){
+      if (ix==0) dx = 2*((x_in[ix+1] - x_in[ix])/2);
+      else if (ix==nx_in-1) dx = 2*((x_in[ix] - x_in[ix-1])/2);
+      else dx = ((x_in[ix+1] - x_in[ix])/2) + ((x_in[ix] - x_in[ix-1])/2);
+      a.r = cos(2*PI*k[index_iter[ik]]*x_in[ix]); a.i = sin(2*PI*k[index_iter[ik]]*x_in[ix]);
+      b = cmul(d_coeff[ik],a);
+      c = crmul(b,dx/dX);
+      value[ik] = cadd(value[ik],c);
+    }
+  } 
+  }  
+
+  return;
+}
+
+float alft_norm_res(complex *d,int nx)
+{
+  int ix;
+  float a;
+  a = 0;
+  for (ix=0;ix<nx;ix++){
+    a = a + d[ix].r*d[ix].r + d[ix].i*d[ix].i;
+  } 
+  a = sqrt(a);
+  return a;
+}

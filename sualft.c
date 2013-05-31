@@ -83,7 +83,10 @@ int main(int argc, char **argv)
   float taper;
   int itw,Itw,Ntw,niter;
   float fmin,fmax;
-
+  int method;
+  float tol;
+  int lsfit_niter;
+  
   /********/    
   fprintf(stderr,"*******SUALFT*********\n");
   /* Initialize */
@@ -106,6 +109,9 @@ int main(int argc, char **argv)
   if (!getparfloat("fmin",&fmin)) fmin = 0;
   if (!getparfloat("fmax",&fmax)) fmax = 0.5/dt;
   if (!getparint("niter", &niter)) niter = 100;
+  if (!getparint("lsfit_niter", &lsfit_niter)) lsfit_niter = 5; /* CG iterations for OMP */
+  if (!getparint("method", &method)) method = 1; /* 1 for ALFT 2 for OMP */
+  if (!getparfloat("tol",&tol)) tol = 0.01; /* quit when norm of residual is less than (tol*100)% of the input*/
   fmax = MIN(fmax,0.5/dt);
 
   din   = ealloc2float(nt,nx);
@@ -182,7 +188,7 @@ process using sliding time windows
    fprintf(stderr,"processing time window %d of %d\n",Itw+1,Ntw);
    if (verbose) fprintf(stderr,"Ltw=%d\n",Ltw);
    if (verbose) fprintf(stderr,"Dtw=%d\n",Dtw);
-   process_time_window(din_tw,dout_tw,h,h_out,hmin,hmax,dt,Ltw,nx,nx_out,fmin,fmax,niter,padt,padx,verbose); 
+   process_time_window(din_tw,dout_tw,h,h_out,hmin,hmax,dt,Ltw,nx,nx_out,fmin,fmax,niter,padt,padx,method,tol,lsfit_niter,verbose); 
    if (Itw==0){ 
      for (ix=0;ix<nx_out;ix++){ 
        for (itw=0;itw<Ltw;itw++){   
